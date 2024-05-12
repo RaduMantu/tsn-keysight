@@ -74,6 +74,7 @@ ssize_t send_pkt_from_gate(int32_t sockfd, struct sockaddr_ll *dst_addr)
     pkt = (pkt_t *) (gate_rbuf[gate].buf + gate_rbuf[gate].tail);
     res = send_pkt(sockfd, pkt, dst_addr);
     GOTO(res == -1, out, "unable to send msg (%s)", strerror(errno));
+
     /* consume structure from ringbuffer */
     gate_rbuf[gate].tail += sizeof(pkt_t);
     gate_rbuf[gate].tail &= RBUF_MASK;

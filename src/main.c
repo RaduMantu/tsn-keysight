@@ -29,6 +29,11 @@ void print_raw_hex(uint8_t *buf, ssize_t buflen) {
     }
 }
 
+typedef struct {
+    int32_t            sockfd;
+    struct sockaddr_ll *dst_addr;
+} thread_data_t;
+
 int recv_packet(int sockfd, uint8_t *buf, size_t *buflen, struct eth_vlan_hdr *vlan_hdr) {
     struct iovec iov[1];
     struct sockaddr_ll sll;
@@ -71,6 +76,18 @@ int recv_packet(int sockfd, uint8_t *buf, size_t *buflen, struct eth_vlan_hdr *v
 	}
     *buflen = res;
     return res;
+}
+
+void *send_worker(void *data)
+{
+    thread_data_t *td = data;
+
+    /* sender main loop */
+    while (1) {
+        send_pkt_from_gate(td->sockfd, td->dst_addr);
+    }
+
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -121,6 +138,17 @@ int main(int argc, char *argv[]) {
     res = bind(rawsock, (struct sockaddr *)&addr, sizeof(addr));
     DIE(res == -1, "unable to set bind iface (%s)", strerror(errno));
 
+    /* create sender thread */
+    pthread_t tsend;
+    thread_data_t td = { .sockfd = rawsock, .dst_addr = &addr };
+    res = pthread_create(&tsend, NULL, send_worker, &td);
+    DIE(res, "unable to create sender thread (%s)", strerror(res));
+
+    /* TODO: niflo */
+
+    return 0;
+
+    /* dead */
     while (1) {
         struct eth_vlan_hdr vlan_hdr;
         size_t plen = sizeof(buf);
