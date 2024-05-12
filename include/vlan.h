@@ -1,5 +1,8 @@
 #include <stdint.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h> /* the L2 protocols */
 
 #define ETH_VLAN_OFFSET  (6*2)
 #define ETH_VLAN_TAG_TPID  0x8100
@@ -31,5 +34,14 @@ static struct eth_vlan_hdr *packet_extract_dot1q(void *pkt_buf, ssize_t len)
 	if (ntohs(vlan->tpid) != ETH_VLAN_TAG_TPID)
 		return 0;
 	return vlan;
+}
+
+static int packet_build_vlan_iov(uint8_t *aux_buf, size_t *buf_len, 
+								 const struct eth_vlan_hdr *vlan_hdr)
+{
+	*(uint16_t*)(aux_buf) = htons(vlan_hdr->tpid);
+	*(uint16_t*)(aux_buf + 2) = htons(vlan_hdr->tci);
+	*buf_len = ETH_VLAN_TAG_SIZE;
+	return *buf_len;
 }
 

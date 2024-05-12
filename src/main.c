@@ -142,7 +142,17 @@ int main(int argc, char *argv[]) {
             .pkt_len = plen,
         };
         memcpy(pkt.pkt, buf, plen);
-        /* TODO: build ancillary data */
+        /* build ancillary data with VLAN tag */
+        vlan_hdr.tpid = ETH_VLAN_TAG_TPID;
+        // vlan_hdr.tci = 0;
+        vlan_hdr.pri = 3;
+        vlan_hdr.vid = 10;
+        if (vlan_hdr.tpid == ETH_VLAN_TAG_TPID) {
+            pkt.auxdata_len = sizeof(pkt.auxdata);
+            packet_build_vlan_iov(pkt.auxdata, &pkt.auxdata_len, &vlan_hdr);
+            DEBUG("SEND DATA:");
+            print_raw_hex(pkt.auxdata, pkt.auxdata_len);
+        }
         res = send_pkt(rawsock, &pkt, &addr);
         DIE(res == -1, "unable to send packet (%s)", strerror(errno));
     }

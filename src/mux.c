@@ -3,6 +3,7 @@
 #include "mux.h"
 #include "slice.h"
 #include "util.h"
+#include "vlan.h"
 
 
 #define PKTS_PER_GATE 512   /* must be pow 2 */
@@ -20,18 +21,25 @@ pthread_mutex_t gate_mutex[NO_GATES];
 ssize_t send_pkt(int32_t sockfd, pkt_t *pkt, struct sockaddr_ll *dst_addr)
 {
     struct msghdr msg = { 0 };      /* message            */
-    struct iovec  iov;              /* sparse data source */
     ssize_t       res = 0;          /* result             */
+    struct iovec  iov[3];
+    int iov_cnt = 1;
+    iov[0].iov_base = pkt->pkt;
+    iov[0].iov_len  = pkt->pkt_len;
 
-    iov.iov_base = pkt->pkt;
-    iov.iov_len  = pkt->pkt_len;
+    if (pkt->auxdata_len) {
+        iov[0].iov_len  = ETH_VLAN_OFFSET;
+        iov[1].iov_base = pkt->auxdata;
+        iov[1].iov_len  = pkt->auxdata_len;
+        iov[2].iov_base = pkt->pkt + ETH_VLAN_OFFSET;
+        iov[2].iov_len  = pkt->pkt_len - ETH_VLAN_OFFSET;
+        iov_cnt = 3;
+    }
 
     msg.msg_name       = dst_addr;
     msg.msg_namelen    = sizeof(struct sockaddr_ll);
-    msg.msg_iov        = &iov;
-    msg.msg_iovlen     = 1;
-    msg.msg_control    = &pkt->auxdata;
-    msg.msg_controllen = pkt->auxdata_len;
+    msg.msg_iov        = iov;
+    msg.msg_iovlen     = iov_cnt;
 
     /* try to send message */
     res = sendmsg(sockfd, &msg, 0);
