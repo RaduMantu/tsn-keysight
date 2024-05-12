@@ -9,7 +9,9 @@
 
 #define MAX_PKT_SZ 1518
 
-#define PKTS_PER_GATE 16384   /* must be pow 2 */
+/* Total memory requirements: 
+ * = 8 (NO_GATES) * PKTS_PER_GATE * 2048 (sizeof pkt_t) */
+#define PKTS_PER_GATE (16384*8)   /* must be pow 2 */
 #define RBUF_TOTAL_LEN (PKTS_PER_GATE * sizeof(pkt_t))
 #define RBUF_MASK (RBUF_TOTAL_LEN - 1)
 
