@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <linux/if_packet.h>
+#include <linux/if_ether.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -29,14 +30,14 @@ void print_raw_hex(uint8_t *buf, ssize_t buflen) {
 
 int recv_packet(int sockfd, uint8_t *buf) {
     int res = read(sockfd, buf, MAX_LEN);
-    if (res < 0) {
-        printf("read failed: %i\n", errno);
-        exit(-1);
-    }
+    RET(res == -1, -1, "unable to read pkt (%s)", strerror(errno));
+
     return res;
 }
 
 int main(int argc, char *argv[]) {
+    uint8_t buf[MAX_LEN];
+
     /* cli args sanity check */
     DIE(argc < 2, "Usage: ./tsn <IFACE>");
 
@@ -58,6 +59,18 @@ int main(int argc, char *argv[]) {
     res = ioctl(rawsock, SIOCSIFFLAGS, &ethreq);
     DIE(res == -1, "unable to set NIC settings (%s)", strerror(errno));
 
+    /* determine MAC address of iface */
+    struct ifreq macreq;
+    strncpy(macreq.ifr_name, argv[1], IF_NAMESIZE);
+    res = ioctl(rawsock, SIOCGIFHWADDR, &macreq);
+    DIE(res == -1, "unable to get NIC MAC addr (%s)", strerror(errno));
+
+    INFO("MAC addr: %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+         macreq.ifr_hwaddr.sa_data[0], macreq.ifr_hwaddr.sa_data[1],
+         macreq.ifr_hwaddr.sa_data[2], macreq.ifr_hwaddr.sa_data[3],
+         macreq.ifr_hwaddr.sa_data[4], macreq.ifr_hwaddr.sa_data[5]);
+
+
     struct sockaddr_ll addr;
     memset(&addr, 0x00, sizeof(addr));
     addr.sll_family = AF_PACKET;
@@ -66,8 +79,14 @@ int main(int argc, char *argv[]) {
     DIE(res == -1, "unable to set bind iface (%s)", strerror(errno));
 
     while (1) {
-        uint8_t buf[MAX_LEN];
         ssize_t plen = recv_packet(rawsock, buf);
+        if (plen == -1)
+            continue;
+
+        /* ignore outgoing packet */
+        if (memcmp(&buf[6], macreq.ifr_hwaddr.sa_data, 6) == 0)
+            continue;
+
         DEBUG("received packet of %ld bytes", plen);
         print_raw_hex(buf, plen);
     }
