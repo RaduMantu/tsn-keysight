@@ -2,7 +2,6 @@
 #include "util.h"
 
 #define SLICE_FREQ (BASE_FREQ * 100)    /* slice interval in Hz */
-#define NO_GATES   8                    /* number of gates */
 
 static tscval_t t_start;    /* moment when first recv occurred */
 

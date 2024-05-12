@@ -14,10 +14,9 @@
 #include <unistd.h>
 
 #include "slice.h"
+#include "mux.h"
 #include "util.h"
 #include "vlan.h"
-
-#define MAX_LEN 1518
 
 void print_raw_hex(uint8_t *buf, ssize_t buflen) {
     ssize_t i = 0, j;
@@ -31,14 +30,14 @@ void print_raw_hex(uint8_t *buf, ssize_t buflen) {
 }
 
 int recv_packet(int sockfd, uint8_t *buf) {
-    int res = read(sockfd, buf, MAX_LEN);
+    int res = read(sockfd, buf, MAX_PKT_SZ);
     RET(res == -1, -1, "unable to read pkt (%s)", strerror(errno));
 
     return res;
 }
 
 int main(int argc, char *argv[]) {
-    uint8_t buf[MAX_LEN];
+    uint8_t buf[MAX_PKT_SZ];
 
     /* cli args sanity check */
     DIE(argc < 2, "Usage: ./tsn <IFACE>");
