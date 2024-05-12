@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
