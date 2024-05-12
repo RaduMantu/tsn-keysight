@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "util.h"
+#include "vlan.h"
 
 #define MAX_LEN 1518
 
@@ -88,6 +89,10 @@ int main(int argc, char *argv[]) {
             continue;
 
         DEBUG("received packet of %ld bytes", plen);
+        struct eth_vlan_hdr *vlan_tag = packet_extract_dot1q(buf, plen);
+        if (vlan_tag) {
+            INFO("Has vlan tag: p %i, vlan id %i\n", vlan_tag->pri, vlan_tag->vid);
+        }
         print_raw_hex(buf, plen);
     }
 
