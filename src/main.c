@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "slice.h"
 #include "util.h"
 #include "vlan.h"
 
