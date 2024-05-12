@@ -12,6 +12,31 @@
 struct circ_buf gate_rbuf[NO_GATES];
 pthread_mutex_t gate_mutex[NO_GATES];
 
+/* send_pkt - sends a packet if any available for current gate
+ *  sockfd    : output raw socket file descriptor
+ *  @pkt      : packet structure to send
+ *  @dst_addr : destination address
+ */
+ssize_t send_pkt(int32_t sockfd, pkt_t *pkt, struct sockaddr_ll *dst_addr)
+{
+    struct msghdr msg = { 0 };      /* message            */
+    struct iovec  iov;              /* sparse data source */
+    ssize_t       res = 0;          /* result             */
+
+    iov.iov_base = pkt->pkt;
+    iov.iov_len  = pkt->pkt_len;
+
+    msg.msg_name       = dst_addr;
+    msg.msg_namelen    = sizeof(struct sockaddr_ll);
+    msg.msg_iov        = &iov;
+    msg.msg_iovlen     = 1;
+    msg.msg_control    = &pkt->auxdata;
+    msg.msg_controllen = sizeof(pkt->auxdata);
+
+    /* try to send message */
+    res = sendmsg(sockfd, &msg, 0);
+    return res;
+}
 
 /* send_pkt - sends a packet if any available for current gate
  *  sockfd    : output raw socket file descriptor
@@ -19,13 +44,11 @@ pthread_mutex_t gate_mutex[NO_GATES];
  *
  * NOTE: call this repeatedly from a sender thread:
  */
-ssize_t send_pkt(int32_t sockfd, struct sockaddr_ll *dst_addr)
+ssize_t send_pkt_from_gate(int32_t sockfd, struct sockaddr_ll *dst_addr)
 {
-    size_t        gate;             /* current gate       */
-    struct msghdr msg = { 0 };      /* message            */
-    struct iovec  iov;              /* sparse data source */
     pkt_t         *pkt;             /* packet wrapper     */
-    ssize_t       res = 0;          /* result             */
+    size_t        gate;             /* current gate       */
+    int res;
 
     /* get current gate */
     gate = get_current_gate();
@@ -41,21 +64,8 @@ ssize_t send_pkt(int32_t sockfd, struct sockaddr_ll *dst_addr)
 
     /* prepare message */
     pkt = (pkt_t *) (gate_rbuf[gate].buf + gate_rbuf[gate].tail);
-
-    iov.iov_base = pkt->pkt;
-    iov.iov_len  = pkt->pkt_len;
-
-    msg.msg_name       = dst_addr;
-    msg.msg_namelen    = sizeof(struct sockaddr_ll);
-    msg.msg_iov        = &iov;
-    msg.msg_iovlen     = 1;
-    msg.msg_control    = &pkt->auxdata;
-    msg.msg_controllen = sizeof(pkt->auxdata);
-
-    /* try to send message */
-    res = sendmsg(sockfd, &msg, 0);
+    res = send_pkt(sockfd, pkt, dst_addr);
     GOTO(res == -1, out, "unable to send msg (%s)", strerror(errno));
-
     /* consume structure from ringbuffer */
     gate_rbuf[gate].tail += sizeof(pkt_t);
     gate_rbuf[gate].tail &= RBUF_MASK;

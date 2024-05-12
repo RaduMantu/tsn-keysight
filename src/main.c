@@ -137,6 +137,13 @@ int main(int argc, char *argv[]) {
             INFO("Has vlan tag: p %i, vlan id %i\n", vlan_hdr.pri, vlan_hdr.vid);
         }
         print_raw_hex(buf, plen);
+
+        pkt_t pkt = {
+            .pkt_len = plen,
+        };
+        memcpy(pkt.pkt, buf, plen);
+        /* TODO: build ancillary data */
+        send_pkt(rawsock, &pkt, &addr);
     }
 
     return 0;

@@ -22,4 +22,7 @@ extern struct circ_buf gate_rbuf[];
 extern pthread_mutex_t gate_mutex[];
 
 /* API */
-ssize_t send_pkt(int32_t sockfd, struct sockaddr_ll *dst_addr);
+ssize_t send_pkt(int32_t sockfd, pkt_t *pkt, struct sockaddr_ll *dst_addr);
+
+ssize_t send_pkt_from_gate(int32_t sockfd, struct sockaddr_ll *dst_addr);
+
