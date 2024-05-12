@@ -4,9 +4,12 @@ BIN = bin
 OBJ = obj
 INC = include
 
+# system base frequency [kHz]
+BASE_FREQ = $(shell cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)
+
 # compilation related parameters
 CC      = clang
-CFLAGS  = -I$(INC) -O2 -gdwarf-5
+CFLAGS  = -I$(INC) -O2 -gdwarf-5 -DBASE_FREQ=$(BASE_FREQ)
 LDFLAGS =
 
 # identify sources & create object targets
