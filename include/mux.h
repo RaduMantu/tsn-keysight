@@ -14,7 +14,7 @@ typedef struct {
     size_t  pkt_len;            /* length of pkt data */
     size_t  auxdata_len;        /* length of aux data */
     uint8_t pkt[MAX_PKT_SZ];    /* pkt data           */
-    uint8_t auxdata[516];       /* aux data           */
+    uint8_t auxdata[484];       /* aux data           */
 } pkt_t;    /* 2048 bytes (must be power fo 2) */
 
 /* gate ring buffers & mutexes */
