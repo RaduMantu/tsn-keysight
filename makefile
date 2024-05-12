@@ -12,6 +12,10 @@ CC      = clang
 CFLAGS  = -I$(INC) -O2 -gdwarf-5 -DBASE_FREQ=$(BASE_FREQ)
 LDFLAGS =
 
+# debug / test parameters
+CFLAGS += $(if $(NODEBUG),-DDEBUG_EN=0)
+CFLAGS += $(if $(DUMMY_MODE),-DDUMMY_ENABLED=$(DUMMY_MODE))
+
 # identify sources & create object targets
 SOURCES = $(wildcard $(SRC)/*.c)
 OBJECTS = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SOURCES))

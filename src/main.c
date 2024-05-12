@@ -19,7 +19,9 @@
 #include "vlan.h"
 
 #define TEST_MODE      0
+#ifndef DUMMY_ENABLED
 #define DUMMY_ENABLED  0
+#endif
 
 void print_raw_hex(uint8_t *buf, ssize_t buflen) {
     ssize_t i = 0, j;
@@ -194,7 +196,7 @@ int main(int argc, char *argv[]) {
                &pkt, sizeof(pkt_t));
         gate_rbuf[cur_gate].head += sizeof(pkt_t);
         gate_rbuf[cur_gate].head &= RBUF_MASK;
-        DEBUG("added to gate %i, h=%d, t=%d\n", cur_gate, 
+        DEBUG("added to gate %i, h=%d, t=%d", cur_gate, 
               gate_rbuf[cur_gate].head, gate_rbuf[cur_gate].tail);
 
     _unlock:

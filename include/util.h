@@ -38,7 +38,9 @@ typedef union {
 } tscval_t;
 
 /* set to 0 in order to suppress DEBUG output */
+#ifndef DEBUG_EN
 #define DEBUG_EN 1
+#endif
 
 #define RED         "\033[31m"
 #define RED_B       "\033[31;1m"
