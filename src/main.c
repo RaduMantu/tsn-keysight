@@ -143,7 +143,8 @@ int main(int argc, char *argv[]) {
         };
         memcpy(pkt.pkt, buf, plen);
         /* TODO: build ancillary data */
-        send_pkt(rawsock, &pkt, &addr);
+        res = send_pkt(rawsock, &pkt, &addr);
+        DIE(res == -1, "unable to send packet (%s)", strerror(errno));
     }
 
     return 0;

@@ -31,7 +31,7 @@ ssize_t send_pkt(int32_t sockfd, pkt_t *pkt, struct sockaddr_ll *dst_addr)
     msg.msg_iov        = &iov;
     msg.msg_iovlen     = 1;
     msg.msg_control    = &pkt->auxdata;
-    msg.msg_controllen = sizeof(pkt->auxdata);
+    msg.msg_controllen = pkt->auxdata_len;
 
     /* try to send message */
     res = sendmsg(sockfd, &msg, 0);
