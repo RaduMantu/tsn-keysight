@@ -18,6 +18,9 @@
 #include "util.h"
 #include "vlan.h"
 
+#define TEST_MODE      0
+#define DUMMY_ENABLED  0
+
 void print_raw_hex(uint8_t *buf, ssize_t buflen) {
     ssize_t i = 0, j;
     while (i < buflen) {
@@ -144,11 +147,62 @@ int main(int argc, char *argv[]) {
     res = pthread_create(&tsend, NULL, send_worker, &td);
     DIE(res, "unable to create sender thread (%s)", strerror(res));
 
-    /* TODO: niflo */
+#if !defined(TEST_MODE) || TEST_MODE == 0
+    int dummy_gate = 0;
+    int cur_gate = -1;
+    while (1) {
+        struct eth_vlan_hdr vlan_hdr;
+        size_t plen = sizeof(buf);
+        res = recv_packet(rawsock, buf, &plen, &vlan_hdr);
+        if (res < 0)
+            continue;
+        /* ignore outgoing packet */
+        if (memcmp(&buf[6], macreq.ifr_hwaddr.sa_data, 6) == 0)
+            continue;
 
-    return 0;
+#if defined(DUMMY_ENABLED) && DUMMY_ENABLED
+        vlan_hdr.tpid = ETH_VLAN_TAG_TPID;
+        vlan_hdr.vid = 0;
+        vlan_hdr.pri = (dummy_gate & DUMMY_ENABLED);
+        dummy_gate++;
+#endif
 
-    /* dead */
+        if (vlan_hdr.tpid != ETH_VLAN_TAG_TPID)
+            continue;
+        if (cur_gate < 0) {
+            if (vlan_hdr.pri != 0) continue;
+            mark_start();
+        }
+        cur_gate = vlan_hdr.pri;
+
+        pkt_t pkt = {
+            .pkt_len = plen,
+        };
+        memcpy(pkt.pkt, buf, plen);
+        /* build ancillary data with VLAN tag */
+        if (vlan_hdr.tpid == ETH_VLAN_TAG_TPID) {
+            pkt.auxdata_len = sizeof(pkt.auxdata);
+            packet_build_vlan_iov(pkt.auxdata, &pkt.auxdata_len, &vlan_hdr);
+        }
+        pthread_mutex_lock(&gate_mutex[cur_gate]);
+        if (CIRC_SPACE(gate_rbuf[cur_gate].head, gate_rbuf[cur_gate].tail, 
+                        RBUF_TOTAL_LEN) < sizeof(pkt_t)) {
+            WAR("no space left in queue %i", cur_gate);
+            goto _unlock;
+        }
+        memcpy(gate_rbuf[cur_gate].buf + gate_rbuf[cur_gate].head, 
+               &pkt, sizeof(pkt_t));
+        gate_rbuf[cur_gate].head += sizeof(pkt_t);
+        gate_rbuf[cur_gate].head &= RBUF_MASK;
+        DEBUG("added to gate %i, h=%d, t=%d\n", cur_gate, 
+              gate_rbuf[cur_gate].head, gate_rbuf[cur_gate].tail);
+
+    _unlock:
+        pthread_mutex_unlock(&gate_mutex[cur_gate]);
+    }
+#endif
+
+#if defined(TEST_MODE) && TEST_MODE == 1
     while (1) {
         struct eth_vlan_hdr vlan_hdr;
         size_t plen = sizeof(buf);
@@ -178,12 +232,13 @@ int main(int argc, char *argv[]) {
         if (vlan_hdr.tpid == ETH_VLAN_TAG_TPID) {
             pkt.auxdata_len = sizeof(pkt.auxdata);
             packet_build_vlan_iov(pkt.auxdata, &pkt.auxdata_len, &vlan_hdr);
-            DEBUG("SEND DATA:");
-            print_raw_hex(pkt.auxdata, pkt.auxdata_len);
+            // DEBUG("SEND DATA:");
+            // print_raw_hex(pkt.auxdata, pkt.auxdata_len);
         }
         res = send_pkt(rawsock, &pkt, &addr);
         DIE(res == -1, "unable to send packet (%s)", strerror(errno));
     }
+#endif
 
     return 0;
 }

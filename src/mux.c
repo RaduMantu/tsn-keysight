@@ -6,9 +6,6 @@
 #include "vlan.h"
 
 
-#define PKTS_PER_GATE 512   /* must be pow 2 */
-#define RBUF_MASK (PKTS_PER_GATE * sizeof(pkt_t) - 1)
-
 /* per-gate ring buffers */
 struct circ_buf gate_rbuf[NO_GATES];
 pthread_mutex_t gate_mutex[NO_GATES];
