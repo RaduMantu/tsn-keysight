@@ -29,10 +29,47 @@ void print_raw_hex(uint8_t *buf, ssize_t buflen) {
     }
 }
 
-int recv_packet(int sockfd, uint8_t *buf) {
-    int res = read(sockfd, buf, MAX_PKT_SZ);
-    RET(res == -1, -1, "unable to read pkt (%s)", strerror(errno));
+int recv_packet(int sockfd, uint8_t *buf, size_t *buflen, struct eth_vlan_hdr *vlan_hdr) {
+    struct iovec iov[1];
+    struct sockaddr_ll sll;
+    struct msghdr msg;
+    struct cmsghdr *cmsg;
+	union {
+		struct cmsghdr	cmsg;
+		char		buf[CMSG_SPACE(sizeof(struct tpacket_auxdata))];
+	} cmsg_buf;
 
+    msg.msg_name        = &sll;
+    msg.msg_namelen     = sizeof(sll);
+    msg.msg_iov         = iov;
+    msg.msg_iovlen      = 1;
+    msg.msg_control     = &cmsg_buf;
+    msg.msg_controllen  = sizeof(cmsg_buf);
+    msg.msg_flags       = 0;
+    iov[0].iov_base = buf;
+    iov[0].iov_len = *buflen;
+    int res = recvmsg(sockfd, &msg, 0);
+    RET(res == -1, -1, "recvmsg failed (%s)", strerror(errno));
+	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+		struct tpacket_auxdata *aux;
+		size_t len;
+		struct eth_vlan_hdr *tag;
+		if (cmsg->cmsg_len < CMSG_LEN(sizeof(struct tpacket_auxdata)) ||
+			cmsg->cmsg_level != SOL_PACKET ||
+			cmsg->cmsg_type != PACKET_AUXDATA) {
+			/* This isn't a PACKET_AUXDATA auxiliary data item */
+			// DEBUG("ign cmsg %02lX", cmsg->cmsg_len);
+			continue;
+		}
+		aux = (struct tpacket_auxdata *)CMSG_DATA(cmsg);
+		// if (!VLAN_VALID(aux, aux)) {
+		// 	continue;
+		// }
+		// DEBUG("aux vlan %03hX %02hX", aux->tp_vlan_tpid, aux->tp_vlan_tci);
+		vlan_hdr->tpid = aux->tp_vlan_tpid;
+		vlan_hdr->tci = aux->tp_vlan_tci;
+	}
+    *buflen = res;
     return res;
 }
 
@@ -60,6 +97,11 @@ int main(int argc, char *argv[]) {
     res = ioctl(rawsock, SIOCSIFFLAGS, &ethreq);
     DIE(res == -1, "unable to set NIC settings (%s)", strerror(errno));
 
+    /* capture ancilarry data (for VLAN tag) */
+    int optval = 1;
+    res = setsockopt(rawsock, SOL_PACKET, PACKET_AUXDATA, &optval, sizeof(optval));
+    DIE(res < 0, "unable to setsockopt PACKET_AUXDATA (%s)", strerror(errno));
+
     /* determine MAC address of iface */
     struct ifreq macreq;
     strncpy(macreq.ifr_name, argv[1], IF_NAMESIZE);
@@ -80,8 +122,10 @@ int main(int argc, char *argv[]) {
     DIE(res == -1, "unable to set bind iface (%s)", strerror(errno));
 
     while (1) {
-        ssize_t plen = recv_packet(rawsock, buf);
-        if (plen == -1)
+        struct eth_vlan_hdr vlan_hdr;
+        size_t plen = sizeof(buf);
+        res = recv_packet(rawsock, buf, &plen, &vlan_hdr);
+        if (res < 0)
             continue;
 
         /* ignore outgoing packet */
@@ -89,9 +133,8 @@ int main(int argc, char *argv[]) {
             continue;
 
         DEBUG("received packet of %ld bytes", plen);
-        struct eth_vlan_hdr *vlan_tag = packet_extract_dot1q(buf, plen);
-        if (vlan_tag) {
-            INFO("Has vlan tag: p %i, vlan id %i\n", vlan_tag->pri, vlan_tag->vid);
+        if (vlan_hdr.tpid == ETH_VLAN_TAG_TPID) {
+            INFO("Has vlan tag: p %i, vlan id %i\n", vlan_hdr.pri, vlan_hdr.vid);
         }
         print_raw_hex(buf, plen);
     }

@@ -8,9 +8,14 @@
 /** Ethernet 802.1q field structure */
 struct eth_vlan_hdr {
 	uint16_t tpid;
-	uint16_t pri : 3;
-	uint16_t dei : 1;
-	uint16_t vid : 12;
+	union {
+		struct {
+			uint16_t vid : 12;
+			uint16_t dei : 1;
+			uint16_t pri : 3;
+		};
+		uint16_t tci;
+	};
 };
 
 
